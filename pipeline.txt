@@ -1,0 +1,54 @@
+===== DSL INPUT =====
+solve cosec
+where height = 5, angle = 30
+find hypotenuse
+
+===== TOKENS =====
+KEYWORD(solve) at line 1
+IDENTIFIER(cosec) at line 1
+KEYWORD(where) at line 2
+IDENTIFIER(height) at line 2
+OPERATOR(=) at line 2
+NUMBER(5) at line 2
+COMMA(,) at line 2
+IDENTIFIER(angle) at line 2
+OPERATOR(=) at line 2
+NUMBER(30) at line 2
+KEYWORD(find) at line 3
+IDENTIFIER(hypotenuse) at line 3
+
+===== PARSER TRACE =====
+Starting parsing process
+Found 'solve' keyword
+Formula detected: cosec
+Processing assignments
+Parsed assignment: height = 5
+Found ',' → expecting another assignment
+Parsed assignment: angle = 30
+Found 'find' keyword
+Target variable: hypotenuse
+Constructing AST node
+Parsing completed successfully
+
+===== AST =====
+SolveNode
+├── Formula: cosec
+├── Target: hypotenuse
+└── Assignments
+    ├── height = 5
+    └── angle = 30
+
+
+===== RESULT =====
+Given:
+height = 5
+angle = 30
+
+Using cosec function:
+cosec(θ) = hypotenuse / height
+cosec(30) = hypotenuse / 5
+hypotenuse = 5 × cosec(30)
+hypotenuse = 10.0
+
+Hence,
+hypotenuse = 10.0

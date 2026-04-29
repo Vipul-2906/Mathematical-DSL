@@ -1,0 +1,6 @@
+SolveNode
+├── Formula: cosec
+├── Target: hypotenuse
+└── Assignments
+    ├── height = 5
+    └── angle = 30

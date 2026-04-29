@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MathDSL — Compiler & Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+/* ── RESET & BASE ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0a0c10;
+  --surface:  #111318;
+  --panel:    #161a22;
+  --border:   #1e2430;
+  --border2:  #252d3a;
+  --accent:   #00d4ff;
+  --accent2:  #7c3aed;
+  --accent3:  #10b981;
+  --warn:     #f59e0b;
+  --error:    #ef4444;
+  --text:     #e2e8f0;
+  --muted:    #64748b;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Syne', sans-serif;
+  --radius:   8px;
+  --glow:     0 0 20px rgba(0,212,255,.15);
+  --glow2:    0 0 30px rgba(124,58,237,.2);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  overflow-x: hidden;
+}
+
+/* ── GRID NOISE BACKGROUND ─────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* ── LAYOUT ─────────────────────────────────────────────────── */
+.shell {
+  position: relative; z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── HEADER ─────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 0 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 8px;
+  display: grid; place-items: center;
+  font-size: 16px;
+  box-shadow: var(--glow);
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.logo-text span { color: var(--accent); }
+
+.badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  color: var(--accent);
+  background: rgba(0,212,255,.08);
+  border: 1px solid rgba(0,212,255,.2);
+  padding: 3px 10px;
+  border-radius: 100px;
+  text-transform: uppercase;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pill {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 100px;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── TOOLBAR ────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.toolbar-left .filename {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.toolbar-examples {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ex-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+
+.ex-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,212,255,.05);
+}
+
+/* ── EDITOR ─────────────────────────────────────────────────── */
+.editor-wrapper {
+  position: relative;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+  transition: border-color .3s;
+}
+
+.editor-wrapper:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.traffic-lights {
+  display: flex;
+  gap: 6px;
+}
+
+.tl {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+}
+
+.tl-r { background: #ff5f57; }
+.tl-y { background: #ffbd2e; }
+.tl-g { background: #28c840; }
+
+.editor-lang {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+
+.editor-body {
+  display: flex;
+  min-height: 180px;
+}
+
+.line-numbers {
+  padding: 14px 0;
+  background: rgba(0,0,0,.2);
+  border-right: 1px solid var(--border);
+  min-width: 48px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  user-select: none;
+  counter-reset: lines;
+}
+
+.line-numbers span {
+  display: block;
+  padding: 0 10px 0 6px;
+}
+
+#dsl-input {
+  flex: 1;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+  resize: none;
+  min-height: 180px;
+  tab-size: 2;
+  caret-color: var(--accent);
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+#dsl-input::placeholder {
+  color: #374151;
+}
+
+/* ── RUN BAR ────────────────────────────────────────────────── */
+.run-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+}
+
+#run-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 28px;
+  background: linear-gradient(135deg, var(--accent), #0099bb);
+  color: #000;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: .5px;
+  transition: all .2s;
+  box-shadow: 0 4px 20px rgba(0,212,255,.3);
+  position: relative;
+  overflow: hidden;
+}
+
+#run-btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.15), transparent);
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+#run-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(0,212,255,.45); }
+#run-btn:hover::before { opacity: 1; }
+#run-btn:active { transform: translateY(0); }
+#run-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+.run-icon { font-size: 16px; }
+
+#clear-btn {
+  padding: 11px 20px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  border-radius: var(--radius);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+#clear-btn:hover { border-color: var(--error); color: var(--error); }
+
+.run-status {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  flex: 1;
+}
+
+#timing {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+/* ── OUTPUT SECTION ─────────────────────────────────────────── */
+.output-heading {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.output-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── GRID OF PANELS ─────────────────────────────────────────── */
+.panels-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* ── SINGLE PANEL ───────────────────────────────────────────── */
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color .3s;
+}
+
+.panel:hover { border-color: var(--border2); }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  color: var(--text);
+}
+
+.panel-icon {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.panel-copy {
+  font-size: 10px;
+  font-family: var(--mono);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.panel-copy:hover { color: var(--text); border-color: var(--text); }
+
+.panel-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 14px;
+  max-height: 220px;
+}
+
+pre.panel-pre {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.65;
+  white-space: pre;
+  color: var(--text);
+  margin: 0;
+}
+
+.empty-state {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #2d3748;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  border: 1px dashed #1e2430;
+  border-radius: 6px;
+  letter-spacing: .5px;
+}
+
+/* ── RESULT PANEL ───────────────────────────────────────────── */
+.result-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.result-panel .panel-header {
+  border-bottom-color: rgba(16,185,129,.2);
+}
+
+.graph-container img:hover {
+  transform: scale(1.2);
+  transition: transform 0.2s ease;
+}
+
+.result-panel .panel-icon { background: var(--accent3); box-shadow: 0 0 8px rgba(16,185,129,.4); }
+
+.result-body {
+  padding: 18px 20px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  color: var(--accent3);
+  min-height: 80px;
+}
+
+.result-body.error {
+  color: var(--error);
+}
+
+/* PANEL COLOR ACCENTS */
+#panel-tokens .panel-icon { background: var(--accent); box-shadow: 0 0 8px rgba(0,212,255,.3); }
+#panel-parse  .panel-icon { background: var(--warn);   box-shadow: 0 0 8px rgba(245,158,11,.3); }
+#panel-ast    .panel-icon { background: var(--accent2); box-shadow: 0 0 8px rgba(124,58,237,.3); }
+#panel-trace  .panel-icon { background: #ec4899;        box-shadow: 0 0 8px rgba(236,72,153,.3); }
+
+/* ── SCROLLBAR ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── SPINNER ────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(0,0,0,.3);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+
+/* ── SYNTAX COLORS ──────────────────────────────────────────── */
+.tok-kw   { color: #7c3aed; }
+.tok-fn   { color: #00d4ff; }
+.tok-num  { color: #10b981; }
+.tok-id   { color: #f59e0b; }
+.tok-op   { color: #ec4899; }
+.tok-punc { color: #64748b; }
+
+/* ── FADE IN ────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn .3s ease both; }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .panels-grid { grid-template-columns: 1fr; }
+  .toolbar-examples { display: none; }
+  header { flex-wrap: wrap; gap: 8px; }
+}
+</style>
+</head>
+<body>
+
+
+
+<div class="shell">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">∑</div>
+      <div>
+        <div class="logo-text">Math<span>DSL</span></div>
+      </div>
+      <div class="badge">Compiler</div>
+    </div>
+    <div class="header-right">
+      <div class="pill"><div class="dot"></div> v1.0.0</div>
+      <div class="pill">Python · Flask</div>
+      <div class="pill">Geometry &amp; Trig</div>
+    </div>
+  </header>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span>⌥</span>
+      <span class="filename">problem.mathdsl</span>
+      <span>·</span>
+      <span>DSL</span>
+    </div>
+    <div class="toolbar-examples">
+      <button class="ex-btn" onclick="loadExample(0)">Pythagorean</button>
+      <button class="ex-btn" onclick="loadExample(1)">Circle Area</button>
+      <button class="ex-btn" onclick="loadExample(2)">Triangle Angle</button>
+      <button class="ex-btn" onclick="loadExample(3)">Distance</button>
+      <button class="ex-btn" onclick="loadExample(4)">Trig sin/cos</button>
+      <button class="ex-btn" onclick="loadExample(5)">Perimeter</button>
+    </div>
+  </div>
+
+  <!-- EDITOR -->
+  <div class="editor-wrapper">
+    <div class="editor-header">
+      <div class="traffic-lights">
+        <div class="tl tl-r"></div>
+        <div class="tl tl-y"></div>
+        <div class="tl tl-g"></div>
+      </div>
+      <div class="editor-lang">MATHDSL · GEOMETRY & TRIGONOMETRY</div>
+    </div>
+    <div class="editor-body">
+      <div class="line-numbers" id="line-nums"><span>1</span></div>
+      <textarea id="dsl-input" spellcheck="false" autocomplete="off"
+        placeholder="solve pythagoras where a = 3, b = 4 find c"></textarea>
+    </div>
+  </div>
+
+  <!-- RUN BAR -->
+  <div class="run-bar">
+    <button id="run-btn" onclick="runCode()">
+      <span class="run-icon">▶</span>
+      <span>Run</span>
+    </button>
+    <button id="clear-btn" onclick="clearAll()">Clear</button>
+    <span class="run-status" id="run-status">Ready. Write DSL code above and click Run.</span>
+    <span id="timing"></span>
+  </div>
+
+  <!-- OUTPUT PANELS -->
+  <div class="output-heading">Compiler Output</div>
+
+  <div class="panels-grid">
+
+    <!-- TOKENS -->
+    <div class="panel" id="panel-tokens">
+      <div class="panel-header">
+        <div class="panel-title">
+          <div class="panel-icon"></div>
+          Tokens — Lexer Output
+        </div>
+        <button class="panel-copy" onclick="copyPanel('out-tokens')">Copy</button>
+      </div>
+      <div class="panel-body">
+        <div class="empty-state" id="empty-tokens">— run code to see tokens —</div>
+        <pre class="panel-pre" id="out-tokens" style="display:none"></pre>
+      </div>
+    </div>
+
+    <!-- PARSE TREE -->
+    <div class="panel" id="panel-parse">
+      <div class="panel-header">
+        <div class="panel-title">
+          <div class="panel-icon"></div>
+          Parse Tree — CST
+        </div>
+        <button class="panel-copy" onclick="copyPanel('out-parse')">Copy</button>
+      </div>
+      <div class="panel-body">
+        <div class="empty-state" id="empty-parse">— run code to see parse tree —</div>
+        <pre class="panel-pre" id="out-parse" style="display:none"></pre>
+      </div>
+    </div>
+
+    <!-- AST -->
+    <div class="panel" id="panel-ast">
+      <div class="panel-header">
+        <div class="panel-title">
+          <div class="panel-icon"></div>
+          AST — Abstract Syntax Tree
+        </div>
+        <button class="panel-copy" onclick="copyPanel('out-ast')">Copy</button>
+      </div>
+      <div class="panel-body">
+        <div class="empty-state" id="empty-ast">— run code to see AST —</div>
+        <pre class="panel-pre" id="out-ast" style="display:none"></pre>
+      </div>
+    </div>
+
+    <!-- TRACE -->
+    <div class="panel" id="panel-trace">
+      <div class="panel-header">
+        <div class="panel-title">
+          <div class="panel-icon"></div>
+          Parser Trace — Call Stack
+        </div>
+        <button class="panel-copy" onclick="copyPanel('out-trace')">Copy</button>
+      </div>
+      <div class="panel-body">
+        <div class="empty-state" id="empty-trace">— run code to see parser trace —</div>
+        <pre class="panel-pre" id="out-trace" style="display:none"></pre>
+      </div>
+    </div>
+  </div>
+  <!-- GRAPH VISUALIZATION -->
+<div class="panel" id="panel-graph">
+  <div class="panel-header">
+    <div class="panel-title">
+      <div class="panel-icon"></div>
+      Graph Visualization
+    </div>
+  </div>
+
+  <div class="panel-body" style="max-height:none;">
+    
+    <div style="margin-bottom:15px;">
+      <div style="font-size:11px;color:#888;margin-bottom:5px;">Parse Tree</div>
+        <div class="graph-container">
+          <img id="parse-img">
+        </div>
+
+         
+    </div>
+
+    <div>
+      <div style="font-size:11px;color:#888;margin-bottom:5px;">AST</div>
+      <div class="graph-container">
+          <img id="ast-img">
+        </div> 
+    </div>
+
+  </div>
+</div>
+
+  <!-- RESULT -->
+  <div class="result-panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <div class="panel-icon"></div>
+        Result — Solver Output
+      </div>
+      <button class="panel-copy" onclick="copyPanel('out-result')">Copy</button>
+    </div>
+    <div class="result-body" id="out-result">Awaiting execution…</div>
+  </div>
+
+</div><!-- /shell -->
+
+<script>
+/* ── EXAMPLES ─────────────────────────────────────────────── */
+const EXAMPLES = [
+  `solve pythagoras where a = 3, b = 4 find c`,
+  `solve area where r = 7`,
+  `solve angle where a = 5, b = 6, c = 7`,
+  `solve distance where x1 = 0, y1 = 0, x2 = 3, y2 = 4`,
+  `calculate sin(45) + cos(45)`,
+  `solve perimeter where l = 8, w = 5`,
+];
+
+function loadExample(i) {
+  document.getElementById('dsl-input').value = EXAMPLES[i];
+  updateLineNums();
+}
+
+/* ── LINE NUMBERS ─────────────────────────────────────────── */
+const textarea = document.getElementById('dsl-input');
+const lineNums = document.getElementById('line-nums');
+
+function updateLineNums() {
+  const lines = textarea.value.split('\n').length;
+  lineNums.innerHTML = Array.from({length: lines}, (_, i) =>
+    `<span>${i + 1}</span>`).join('');
+}
+
+textarea.addEventListener('input', updateLineNums);
+textarea.addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = textarea.selectionStart;
+    textarea.value = textarea.value.substring(0, s) + '  ' + textarea.value.substring(s);
+    textarea.selectionStart = textarea.selectionEnd = s + 2;
+    updateLineNums();
+  }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    runCode();
+  }
+});
+
+/* ── RUN ──────────────────────────────────────────────────── */
+async function runCode() {
+  const code = textarea.value.trim();
+  if (!code) return;
+
+  const btn = document.getElementById('run-btn');
+  const status = document.getElementById('run-status');
+  const timing = document.getElementById('timing');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div><span>Running…</span>';
+  status.textContent = 'Compiling…';
+  timing.textContent = '';
+
+  const t0 = performance.now();
+
+  try {
+    const res = await fetch('/compile', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ code }),
+    });
+
+    const data = await res.json();
+    const ms = (performance.now() - t0).toFixed(1);
+    timing.textContent = `⏱ ${ms}ms`;
+
+    if (data.error) {
+      showError(data.error);
+      status.textContent = '✖ Compilation failed';
+    } else {
+      populatePanels(data);
+      status.textContent = '✔ Compiled & executed successfully';
+    }
+  } catch (err) {
+    showError('Network error: ' + err.message);
+    status.textContent = '✖ Request failed';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="run-icon">▶</span><span>Run</span>';
+  }
+}
+
+function populatePanels(data) {
+  set('tokens', data.tokens || '');
+  set('parse',  data.parse_tree || '');
+  set('ast',    data.ast || '');
+  set('trace',  data.trace || '');
+
+  // RESULT
+  const rb = document.getElementById('out-result');
+  rb.className = 'result-body fade-in';
+  rb.textContent = data.result || '';
+
+  // 🔥 GRAPH IMAGES
+  const astImg = document.getElementById('ast-img');
+const parseImg = document.getElementById('parse-img');
+
+if (data.ast_img) {
+  astImg.src = data.ast_img + "?t=" + new Date().getTime();
+  astImg.style.display = "block";
+}
+
+if (data.parse_img) {
+  parseImg.src = data.parse_img + "?t=" + new Date().getTime();
+  parseImg.style.display = "block";
+}
+}
+
+function set(key, text) {
+  const empty = document.getElementById('empty-' + key);
+  const pre   = document.getElementById('out-' + key);
+  if (!text) return;
+  empty.style.display = 'none';
+  pre.style.display = 'block';
+  pre.className = 'panel-pre fade-in';
+  pre.textContent = text;
+}
+
+function showError(msg) {
+  ['tokens','parse','ast','trace'].forEach(k => {
+    document.getElementById('empty-' + k).style.display = 'flex';
+    const pre = document.getElementById('out-' + k);
+    pre.style.display = 'none';
+    pre.textContent = '';
+  });
+  const rb = document.getElementById('out-result');
+  rb.className = 'result-body error fade-in';
+  rb.textContent = '⚠ Error\n\n' + msg;
+}
+
+function clearAll() {
+  textarea.value = '';
+  updateLineNums();
+  ['tokens','parse','ast','trace'].forEach(k => {
+    document.getElementById('empty-' + k).style.display = 'flex';
+    const pre = document.getElementById('out-' + k);
+    pre.style.display = 'none';
+    pre.textContent = '';
+  });
+  const rb = document.getElementById('out-result');
+  rb.className = 'result-body';
+  rb.textContent = 'Awaiting execution…';
+  document.getElementById('run-status').textContent = 'Ready.';
+  document.getElementById('timing').textContent = '';
+}
+
+/* ── COPY ─────────────────────────────────────────────────── */
+function copyPanel(id) {
+  const el = document.getElementById(id);
+  if (!el.textContent) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = el.closest('.panel')?.querySelector('.panel-copy') ||
+                el.closest('.result-panel')?.querySelector('.panel-copy');
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500); }
+  });
+}
+
+/* ── CTRL+ENTER hint ──────────────────────────────────────── */
+document.getElementById('run-status').textContent = 'Ready — Ctrl+Enter to run';
+</script>
+</body>
+</html>

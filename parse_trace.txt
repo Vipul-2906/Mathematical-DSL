@@ -1,0 +1,11 @@
+Starting parsing process
+Found 'solve' keyword
+Formula detected: cosec
+Processing assignments
+Parsed assignment: height = 5
+Found ',' → expecting another assignment
+Parsed assignment: angle = 30
+Found 'find' keyword
+Target variable: hypotenuse
+Constructing AST node
+Parsing completed successfully

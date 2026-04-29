@@ -1,0 +1,2 @@
+Starting parsing process
+Parsing completed successfully
